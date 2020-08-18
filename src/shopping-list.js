@@ -1,5 +1,5 @@
 import $ from 'jquery';
-
+import api from './api';
 import store from './store';
 
 const generateItemElement = function (item) {
@@ -31,16 +31,25 @@ const generateShoppingItemsString = function (shoppingList) {
   return items.join('');
 };
 
+// generate error html, intake the error.message
+
+// render the error, if store.error, else empty the container that
+// was put in before
+
+// close error button handling
+// set local error to null and 
+// render error
+
 const render = function () {
+  // is there an error???
+
   // Filter item list if store prop is true by item.checked === false
   let items = [...store.items];
   if (store.hideCheckedItems) {
     items = items.filter(item => !item.checked);
   }
-
   // render the shopping list in the DOM
   const shoppingListItemsString = generateShoppingItemsString(items);
-
   // insert that HTML into the DOM
   $('.js-shopping-list').html(shoppingListItemsString);
 };
@@ -50,8 +59,18 @@ const handleNewItemSubmit = function () {
     event.preventDefault();
     const newItemName = $('.js-shopping-list-entry').val();
     $('.js-shopping-list-entry').val('');
-    store.addItem(newItemName);
-    render();
+    api.createItem(newItemName)
+    // api call to create item, returns object in json format,
+      .then((newItemName) => {
+        // add new item to local store
+        store.addItem(newItemName);
+        // re render
+        render();
+      }).catch((e) => {
+        store.setError(error.message);
+        // renderError();
+
+      });
   });
 };
 
@@ -66,10 +85,19 @@ const handleDeleteItemClicked = function () {
   $('.js-shopping-list').on('click', '.js-item-delete', event => {
     // get the index of the item in store.items
     const id = getItemIdFromElement(event.currentTarget);
-    // delete the item
-    store.findAndDelete(id);
+    api.deleteItem(id)
+    // delete from api, when that's done,
+      .then(() => {
+      // delete that same item from the local store
+        store.findAndDelete(id);
+        // re render
+        render();
+      });
     // render the updated shopping list
-    render();
+  }).catch((e) => {
+    console.log(e);
+    store.setError(e.message);
+    // renderError();
   });
 };
 
@@ -78,16 +106,37 @@ const handleEditShoppingItemSubmit = function () {
     event.preventDefault();
     const id = getItemIdFromElement(event.currentTarget);
     const itemName = $(event.currentTarget).find('.shopping-item').val();
-    store.findAndUpdateName(id, itemName);
-    render();
+    // update item in api, with item and the object.assign
+    api.updateItem(id, {name: itemName})
+    // update item in local store
+      .then(() => {
+        store.findAndUpdate(id, {name: itemName});
+        // rerender
+        render();
+      }).catch(e => {
+        // console.log(e);
+        store.setError(e.message);
+        // renderError();
+      });
   });
 };
 
 const handleItemCheckClicked = function () {
   $('.js-shopping-list').on('click', '.js-item-toggle', event => {
     const id = getItemIdFromElement(event.currentTarget);
-    store.findAndToggleChecked(id);
-    render();
+    const item = store.findById(id);
+    
+    // api update for the checked property with object.assign
+    api.updateItem(id, {checked: !item.checked})
+      .then(() => {
+        // local update by id, and reassign checked value
+        store.findAndUpdate(id, {checked: !item.checked});
+        // rerender
+        render();
+      }).catch(e => {
+        store.setError(e.message);
+        // renderError();
+      };
   });
 };
 
